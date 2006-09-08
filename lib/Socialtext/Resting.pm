@@ -10,7 +10,7 @@ use Class::Field 'field';
 
 use Readonly;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head1 NAME
 
@@ -62,6 +62,11 @@ field 'workspace';
 field 'username';
 field 'password';
 field 'server';
+field 'accept';
+field 'filter';
+field 'order';
+field 'count';
+field 'query';
 
 =head2 new
 
@@ -97,6 +102,7 @@ sub new {
 sub get_page {
     my $self = shift;
     my $pname = shift;
+    my $accept = $self->accept || 'text/x.socialtext-wiki';
 
     my $uri = $self->_make_uri(
         'page',
@@ -106,7 +112,7 @@ sub get_page {
     my ( $status, $content ) = $self->_request(
         uri    => $uri,
         method => 'GET',
-        accept => 'text/x.socialtext-wiki',
+        accept => $accept,
     );
 
     if ( $status == 200 || $status == 404 ) {
@@ -326,20 +332,45 @@ sub get_pages {
     return $self->_get_things('pages');
 }
 
+sub _extend_uri {
+    my $self = shift;
+    my $uri = shift;
+    my @extend;
+
+    if ( $self->filter ) {
+        push (@extend, "filter=" . $self->filter);
+    }
+    if ( $self->query ) {
+        push (@extend, "q=" . $self->query);
+    }
+    if ( $self->order ) {
+        push (@extend, "order=" . $self->order);
+    }
+    if ( $self->count ) {
+        push (@extend, "count=" . $self->count);
+    }
+    if (@extend) {
+        $uri .= "?" . join(';', @extend);
+    }
+    return $uri;
+
+}
 sub _get_things {
     my $self         = shift;
     my $things       = shift;
     my %replacements = @_;
+    my $accept = $self->accept || 'text/plain';
 
     my $uri = $self->_make_uri(
         $things,
         { ws => $self->workspace, %replacements }
     );
-
+    $uri = $self->_extend_uri($uri);
+       
     my ( $status, $content ) = $self->_request(
         uri    => $uri,
         method => 'GET',
-        accept => 'text/plain',
+        accept => $accept,
     );
 
     if ( $status == 200 ) {

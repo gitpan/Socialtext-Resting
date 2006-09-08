@@ -36,6 +36,31 @@ use App::Options (
             env         => "STRUT_SERVER",
             required    => 0,
         },
+        accept => {
+            description => "Accept header",
+            env         => "STRUT_ACCEPT",
+            required    => 0,
+        },
+        count => {
+            description => "Number to return",
+            env         => "STRUT_FILTER",
+            required    => 0,
+        },
+        filter => {
+            description => "Filter name",
+            env         => "STRUT_FILTER",
+            required    => 0,
+        },
+        query => {
+            description => "Query string",
+            env         => "STRUT_QUERY",
+            required    => 0,
+        },
+        order => {
+            description => "Return order",
+            env         => "STRUT_ORDER",
+            required    => 0,
+        },
     },
 );
 
@@ -50,8 +75,8 @@ Socialtext REST services
 
    strut configure
    
-   strut list-workspaces
-   strut list-pages <workspace>
+   strut list_workspaces
+   strut list_pages <workspace>
 
    strut get_page <workspace> <pagename>
    strut set_page <workspace> <pagename> <filename>
@@ -60,6 +85,16 @@ Socialtext REST services
    strut set_tags <workspace> <pagename>
 
    strut add_attachment <workspace> <pagename> <filename>
+
+   All list operations can further be controlled with the following operations:
+   --query (search term for within the results)
+   --filter (filter the titles of the results)
+   --order (only accepts 'newest' right now)
+   --count (restrict number of returned results)
+   --accept (for your accept headers - text/html, text/plain, application/json)
+
+   Example:
+     strut --query=searchterm --filter=titlefilter --order=newest --count=number list_pages myworkspace 
 
 =cut
 
@@ -89,6 +124,11 @@ our $Strutter = Socialtext::Resting->new(
         username => $opts{username},
         password => $opts{password},
         server   => $opts{server},
+        accept   => $opts{accept},
+        query    => $opts{query},
+        order    => $opts{order},
+        filter   => $opts{filter},
+        count    => $opts{count},
 );
 
 dispatch();
@@ -113,7 +153,7 @@ sub dispatch {
         if ( exists $strut_command{$verb} ) {
             $strut_command{$verb}();
         } else {
-            usage ("No such command $verb")
+            print "No such command $verb - for a complete list of subcommands type 'strut help'\n";
         }
     }
     exit;
@@ -126,7 +166,7 @@ sub init_commands {
         list_pages      => sub {list_pages()},
         get_page        => sub {get_page()},
         set_page        => sub {set_page()},
-        list_tags        => sub {list_tags()},
+        list_tags       => sub {list_tags()},
         set_tags        => sub {set_tags()},
         add_attachment  => sub {add_attachment()},
         configure       => sub {configure()},
