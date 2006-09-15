@@ -36,6 +36,11 @@ use App::Options (
             env         => "STRUT_SERVER",
             required    => 0,
         },
+        verbose => {
+            description => "Verbosity",
+            env         => "STRUT_VERBOSE",
+            required    => 0,
+        },
         accept => {
             description => "Accept header",
             env         => "STRUT_ACCEPT",
@@ -129,6 +134,7 @@ our $Strutter = Socialtext::Resting->new(
         order    => $opts{order},
         filter   => $opts{filter},
         count    => $opts{count},
+        verbose  => $opts{verbose},
 );
 
 dispatch();

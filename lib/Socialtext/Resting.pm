@@ -10,7 +10,7 @@ use Class::Field 'field';
 
 use Readonly;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 =head1 NAME
 
@@ -46,6 +46,7 @@ Readonly my %ROUTES   => (
     pageattachment => $BASE_URI
         . '/:ws/pages/:pname/attachments/:attachment_id',
     pageattachments      => $BASE_URI . '/:ws/pages/:pname/attachments',
+    taggedpages          => $BASE_URI . '/:ws/tags/:tag/pages',
     workspace            => $BASE_URI . '/:ws',
     workspaces           => $BASE_URI,
     workspacetag         => $BASE_URI . '/:ws/tags/:tag',
@@ -62,6 +63,7 @@ field 'workspace';
 field 'username';
 field 'password';
 field 'server';
+field 'verbose';
 field 'accept';
 field 'filter';
 field 'order';
@@ -76,8 +78,8 @@ field 'query';
         server   => $opts{server},
     );
     
-    Creates a Socialtext::Resting object for the 
-    specified server/user/password combination.
+Creates a Socialtext::Resting object for the specified
+server/user/password combination.
 
 =cut
 
@@ -93,9 +95,9 @@ sub new {
     $Rester->workspace('wikiname');
     $Rester->get_page('page_name');
 
-    Retrieves the content of the specified page.  Note that 
-    the workspace method needs to be called first to specify 
-    which workspace to operate on.
+Retrieves the content of the specified page.  Note that 
+the workspace method needs to be called first to specify 
+which workspace to operate on.
 
 =cut
 
@@ -128,9 +130,9 @@ sub get_page {
     $Rester->workspace('wikiname');
     $Rester->get_attachment('attachment_id);
 
-    Retrieves the specified attachment from the workspace.  
-    Note that the workspace method needs to be called first 
-    to specify which workspace to operate on.
+Retrieves the specified attachment from the workspace.  
+Note that the workspace method needs to be called first 
+to specify which workspace to operate on.
 
 =cut
 
@@ -162,7 +164,7 @@ sub get_attachment {
     $Rester->workspace('wikiname');
     $Rester->put_pagetag('page_name', 'tag');
 
-    Add the specified tag to the page.
+Add the specified tag to the page.
 
 =cut
 
@@ -194,7 +196,7 @@ sub put_pagetag {
     $Rester->workspace('wikiname');
     $Rester->delete_pagetag('page_name', 'tag');
 
-    Delete the specified tag from the page.
+Delete the specified tag from the page.
 
 =cut
 
@@ -226,7 +228,7 @@ sub delete_pagetag {
     $Rester->workspace('wikiname');
     $Rester->post_attachment('page_name',$id,$content,$mime_type);
 
-    Attach the file to the specified page
+Attach the file to the specified page
 
 =cut
 
@@ -270,7 +272,7 @@ sub post_attachment {
     $Rester->workspace('wikiname');
     $Rester->put_page('page_name',$content);
 
-    Save the content as a page in the wiki.
+Save the content as a page in the wiki.
 
 =cut
 
@@ -322,7 +324,7 @@ sub _make_uri {
     $Rester->workspace('wikiname');
     $Rester->get_pages();
 
-    List all pages in the wiki.
+List all pages in the wiki.
 
 =cut
 
@@ -392,7 +394,7 @@ sub get_pagetag {
     $Rester->workspace('wikiname');
     $Rester->get_pagetags('page_name');
 
-    List all pagetags on the specified page 
+List all pagetags on the specified page 
 
 =cut
 
@@ -403,11 +405,26 @@ sub get_pagetags {
     return $self->_get_things( 'pagetags', pname => $pname );
 }
 
+=head2 get_taggedpages
+
+    $Rester->worksapce('wikiname');
+    $Rester->get_taggedpages('tag');
+
+List all the pages that are tagged with 'tag'.
+
+=cut
+sub get_taggedpages {
+    my $self  = shift;
+    my $tag = shift;
+
+    return $self->_get_things( 'taggedpages', tag => $tag );
+}
+
 =head2 get_workspaces
 
     $Rester->get_workspaces();
 
-    List all workspaces on the server
+List all workspaces on the server
 
 =cut
 
@@ -422,7 +439,9 @@ sub _request {
     my %p    = @_;
     my $ua   = LWP::UserAgent->new();
     my $uri  = $self->server . $p{uri};
-    warn "uri: $uri\n";
+    if ($self->verbose) {
+        warn "uri: $uri\n";
+    }
     my $request = HTTP::Request->new( $p{method}, $uri );
     $request->authorization_basic( $self->username, $self->password );
 
@@ -441,5 +460,7 @@ sub _request {
 
 Chris Dent, C<< <chris.dent@socialtext.com> >>
 Kirsten Jones C<< <kirsten.jones@socialtext.com> >>
+
+=cut
 
 1;

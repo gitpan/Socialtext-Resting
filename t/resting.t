@@ -5,7 +5,7 @@ use IPC::Run;
 use strict;
 use warnings;
 
-plan tests => 4;
+plan tests => 5;
 
 my $Strutter = Socialtext::Resting->new(
         username => 'rest-tester@socialtext.com',
@@ -47,6 +47,10 @@ SKIP: {
     my $tags = join (' ', $Strutter->get_pagetags("Test page"));
 
     like( $tags, qr/Taggity tag/, "Tag with spaces included");
+
+    my @tagged_pages = $Strutter->get_taggedpages('Taggy');
+    is( $tagged_pages[0], 'Test page',
+        'Test pages is listed in Taggy pages' );
 }
 
 sub readfile {
