@@ -21,7 +21,7 @@ eval { $Strutter->put_page("Test page", $page_content);};
 my $network_skip = 1 if $@;
 
 SKIP: {
-    skip "unable to access test server", 4 if $network_skip;
+    skip "unable to access test server", 5 if $network_skip;
     # Get it back and check it
     my $content = $Strutter->get_page("Test page");
 

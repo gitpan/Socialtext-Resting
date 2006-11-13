@@ -10,7 +10,7 @@ use Class::Field 'field';
 
 use Readonly;
 
-our $VERSION = '0.03';
+our $VERSION = '0.06';
 
 =head1 NAME
 
@@ -334,6 +334,12 @@ sub get_pages {
     return $self->_get_things('pages');
 }
 
+sub get_page_attachments {
+    my $self = shift;
+    
+    return $self->_get_things('pageattachments');
+}
+
 sub _extend_uri {
     my $self = shift;
     my $uri = shift;
@@ -386,7 +392,9 @@ sub _get_things {
     }
 }
 
-sub get_pagetag {
+sub get_workspace_tags {
+    my $self = shift;
+    return $self->_get_things( 'workspacetags' )
 }
 
 =head2 get_pagetags
@@ -448,7 +456,6 @@ sub _request {
     $request->header( 'Accept'       => $p{accept} ) if $p{accept};
     $request->header( 'Content-Type' => $p{type} )   if $p{type};
     $request->content( $p{content} ) if $p{content};
-
     my $response = $ua->simple_request($request);
 
     my $location = $response->header('location');

@@ -12,13 +12,14 @@ my %config = (
         'bin/strut',
     ],
     'PREREQ_PM' => {
-        'URI::Escape'    => 0,
+        'URI::Escape'    => 1.31,
         'LWP::UserAgent' => 0,
         'HTTP::Request'  => 0,
         'Class::Field'   => 0,
         'Readonly'       => 0,
         'Pod::Usage'     => 0,
         'App::Options'   => 0,
+	'IPC::Run'       => 0,
     },    # e.g., Module::Name => 1.1
     (
         $] >= 5.005

@@ -86,9 +86,13 @@ Socialtext REST services
    strut get_page <workspace> <pagename>
    strut set_page <workspace> <pagename> <filename>
 
-   strut get_tags <workspace> <pagename>
+   strut list_tags <workspace> <pagename>
    strut set_tags <workspace> <pagename>
 
+   strut list_tagged_pages <workspace> <tag>
+
+   strut list_attachments <workspace> <pagename>
+   strut get_attachment <workspace> <pagename> <attachment>
    strut add_attachment <workspace> <pagename> <filename>
 
    All list operations can further be controlled with the following operations:
@@ -166,17 +170,21 @@ sub dispatch {
 }
                 
 sub init_commands {
-    %strut_command = (
-        help            => sub {usage()},
-        list_workspaces => sub {list_workspaces()},
-        list_pages      => sub {list_pages()},
-        get_page        => sub {get_page()},
-        set_page        => sub {set_page()},
-        list_tags       => sub {list_tags()},
-        set_tags        => sub {set_tags()},
-        add_attachment  => sub {add_attachment()},
-        configure       => sub {configure()},
-    );
+	%strut_command = (
+			help                      => sub {usage()},
+			list_workspaces           => sub {list_workspaces()},
+			list_pages                => sub {list_pages()},
+			list_workspace_tags       => sub {list_workspace_tags()},
+			list_tagged_pages         => sub {list_tagged_pages()},
+			get_page                  => sub {get_page()},
+			set_page                  => sub {set_page()},
+			list_tags		  => sub {list_tags()},
+			set_tags		  => sub {set_tags()},
+			list_attachments	  => sub {list_attachments()},
+			get_attachment		  => sub {get_attachment()},
+			add_attachment		  => sub {add_attachment()},
+			configure		  => sub {configure()},
+			);
 }
 =head1 COMMANDS
 
@@ -222,7 +230,9 @@ sub configure {
 # pick_workspace
 # show_workspaces
 # show_pages
-# list_pagese
+# list_pages
+# list_tagged_pages
+# list_workspace_tags
 # 
 ##################################################
 
@@ -255,6 +265,29 @@ sub _list_pages {
     $Strutter->get_pages();
 }
 
+sub _list_workspace_tags {
+    use_positional("workspace" => 0);
+    _pick_workspace($opts{workspace});
+    $Strutter->get_workspace_tags();
+}
+
+sub _list_tagged_pages {
+    use_positional("workspace" => 0,
+		   "tag" => 1);
+    _pick_workspace($opts{workspace});
+    $Strutter->get_taggedpages($opts{tag});
+}
+
+=head2 list_workspace_tags <workspace>
+
+List the tags for a workspace.
+
+=cut
+
+sub list_workspace_tags {
+    printemout(_list_workspace_tags());
+}
+
 =head2 list_pages <workspace>
 
 Give a list of all pages in the given workspace.  If no workspace
@@ -265,6 +298,15 @@ sub list_pages {
     printemout(_list_pages());
 }
 
+=head2 list_tagged_pages <workspace>
+
+Give a list of all pages in the given workspace with the given tag.
+
+=cut
+sub list_tagged_pages {
+    printemout(_list_tagged_pages());
+}
+
 ##################################################
 #
 # Page actions - these actions need a workspace 
@@ -272,7 +314,9 @@ sub list_pages {
 # pick_page
 # get_page
 # set_page
-# get_tags
+# list_tags
+# list_attachments
+# get_attachment
 # set_tags
 # 
 ##################################################
@@ -350,13 +394,33 @@ sub add_attachment {
     print "$opts{filename} attached as $location\n";
 }
 
-=head2 list_tags <workspace> <page_name>
+=head2 list_attachments <workspace> <page_name>
+
+List all attachments on the specified page.
+
+=cut
+
+sub list_attachments {
+    printemout(_list_attachments());
+}
+
+sub _list_attachments {
+    use_positional ("workspace" => 0,
+		    "page"      => 1);
+    if (!$opts{workspace} || !$opts{page}) {
+	usage("list_attachments needs a workspace and page name to operate.");
+    }
+    my $Page = pick_page($opts{workspace}, $opts{page});
+    $Strutter->get_page_attachments($Page);
+}
+
+=head2 list_pagetags <workspace> <page_name>
 
 List all tags on the specified page.
 
 =cut
 
-sub list_tags {
+sub list_pagetags {
     printemout(_list_tags());
 }
 
@@ -364,9 +428,9 @@ sub _list_tags {
     use_positional ("workspace" => 0,
                     "page"      => 1);
     if ($opts{workspace} && !$opts{page}) {
-        usage("get_tags needs a workspace and page name to operate.\n\n" .
+        usage("list_tags needs a workspace and page name to operate.\n\n" .
               "You can pass these in via the command line:\n\t" .
-              "get_tags <workspace> <page_name>\n");
+              "list_tags <workspace> <page_name>\n");
     }
     my $Page = pick_page($opts{workspace}, $opts{page});
     $Strutter->get_pagetags($Page);
