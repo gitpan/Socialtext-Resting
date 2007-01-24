@@ -10,7 +10,7 @@ use Class::Field 'field';
 
 use Readonly;
 
-our $VERSION = '0.06';
+our $VERSION = '0.11';
 
 =head1 NAME
 
@@ -43,6 +43,7 @@ Readonly my %ROUTES   => (
     pages          => $BASE_URI . '/:ws/pages',
     pagetag        => $BASE_URI . '/:ws/pages/:pname/tags/:tag',
     pagetags       => $BASE_URI . '/:ws/pages/:pname/tags',
+    pagecomments   => $BASE_URI . '/:ws/pages/:pname/comments',
     pageattachment => $BASE_URI
         . '/:ws/pages/:pname/attachments/:attachment_id',
     pageattachments      => $BASE_URI . '/:ws/pages/:pname/attachments',
@@ -69,6 +70,8 @@ field 'filter';
 field 'order';
 field 'count';
 field 'query';
+field 'etag_cache' => {};
+field 'http_header_debug';
 
 =head2 new
 
@@ -104,6 +107,7 @@ which workspace to operate on.
 sub get_page {
     my $self = shift;
     my $pname = shift;
+    $pname = _name_to_id($pname);
     my $accept = $self->accept || 'text/x.socialtext-wiki';
 
     my $uri = $self->_make_uri(
@@ -111,13 +115,14 @@ sub get_page {
         { pname => $pname, ws => $self->workspace }
     );
 
-    my ( $status, $content ) = $self->_request(
+    my ( $status, $content, $response ) = $self->_request(
         uri    => $uri,
         method => 'GET',
         accept => $accept,
     );
 
     if ( $status == 200 || $status == 404 ) {
+        $self->{etag_cache}{$pname} = $response->header('etag');
         return $content;
     }
     else {
@@ -128,7 +133,7 @@ sub get_page {
 =head2 get_attachment
 
     $Rester->workspace('wikiname');
-    $Rester->get_attachment('attachment_id);
+    $Rester->get_attachment('attachment_id');
 
 Retrieves the specified attachment from the workspace.  
 Note that the workspace method needs to be called first 
@@ -173,6 +178,7 @@ sub put_pagetag {
     my $pname = shift;
     my $tag   = shift;
 
+    $pname = _name_to_id($pname);
     my $uri = $self->_make_uri(
         'pagetag',
         { pname => $pname, ws => $self->workspace, tag => $tag }
@@ -205,6 +211,7 @@ sub delete_pagetag {
     my $pname = shift;
     my $tag   = shift;
 
+    $pname = _name_to_id($pname);
     my $uri = $self->_make_uri(
         'pagetag',
         { pname => $pname, ws => $self->workspace, tag => $tag }
@@ -239,6 +246,7 @@ sub post_attachment {
     my $attachment_content = shift;
     my $attachment_type    = shift;
 
+    $pname = _name_to_id($pname);
     my $uri = $self->_make_uri(
         'pageattachments',
         {
@@ -249,13 +257,14 @@ sub post_attachment {
 
     $uri .= "?name=$attachment_id";
 
-    my ( $status, $content, $location ) = $self->_request(
+    my ( $status, $content, $response ) = $self->_request(
         uri     => $uri,
         method  => 'POST',
         type    => $attachment_type,
         content => $attachment_content,
     );
 
+    my $location = $response->header('location');
     $location =~ m{.*/attachments/([^/]+)};
     $location = URI::Escape::uri_unescape($1);
 
@@ -267,15 +276,65 @@ sub post_attachment {
     }
 }
 
+=head2 post_comment
+
+    $Rester->workspace('wikiname');
+    $Rester->post_comment( 'page_name', "me too" );
+
+Add a comment to a page.
+
+=cut
+
+sub post_comment {
+    my $self    = shift;
+    my $pname   = shift;
+    my $comment = shift;
+
+    $pname = _name_to_id($pname);
+    my $uri = $self->_make_uri(
+        'pagecomments',
+        {
+            pname => $pname,
+            ws    => $self->workspace
+        },
+    );
+
+    my ( $status, $content ) = $self->_request(
+        uri     => $uri,
+        method  => 'POST',
+        type    => 'text/x.socialtext-wiki',
+        content => $comment,
+    );
+
+    die "$status: $content\n" unless $status == 204;
+}
+
 =head2 put_page 
 
     $Rester->workspace('wikiname');
     $Rester->put_page('page_name',$content);
 
-Save the content as a page in the wiki.
+Save the content as a page in the wiki.  $content can either be a string,
+which is treated as wikitext, or a hash with the following keys:
+
+=over
+
+=item content
+
+A string which is the page's wiki content.
+
+=item date
+
+RFC 2616 HTTP Date format string of the time the page was last edited
+
+=item from
+
+A username of the last editor of the page. If the the user does not exist it
+will be created, but will not be added to the workspace.
+
+=back
 
 =cut
-
 sub put_page {
     my $self         = shift;
     my $pname        = shift;
@@ -286,11 +345,24 @@ sub put_page {
         { pname => $pname, ws => $self->workspace }
     );
 
+    my $type = 'text/x.socialtext-wiki';
+    if ( ref $page_content ) {
+        $type         = 'application/json';
+        $page_content = JSON->new->objToJson($page_content);
+    }
+
+    my %extra_opts;
+    my $page_id = _name_to_id($pname);
+    if (my $prev_etag = $self->{etag_cache}{$page_id}) {
+        $extra_opts{if_match} = $prev_etag;
+    }
+
     my ( $status, $content ) = $self->_request(
         uri     => $uri,
         method  => 'PUT',
-        type    => 'text/x.socialtext-wiki',
+        type    => $type,
         content => $page_content,
+        %extra_opts,
     );
 
     if ( $status == 204 || $status == 201 ) {
@@ -300,6 +372,28 @@ sub put_page {
         die "$status: $content\n";
     }
 }
+
+# REVIEW: This is here because of escaping problems we have with
+# apache web servers. This code effectively translate a Page->uri
+# to a Page->id. By so doing the troublesome characters are factored
+# out, getting us past a bug. This change should _not_ be maintained
+# any longer than strictly necessary, primarily because it 
+# creates an informational dependency between client and server
+# code by representing name_to_id translation code on both sides
+# of the system. Since it is not used for page PUT, new pages
+# will safely have correct page titles.
+sub _name_to_id {
+    my $id = shift;
+    $id = '' if not defined $id;
+    $id =~ s/[^\p{Letter}\p{Number}\p{ConnectorPunctuation}\pM]+/_/g;
+    $id =~ s/_+/_/g;
+    $id =~ s/^_(?=.)//;
+    $id =~ s/(?<=.)_$//;
+    $id =~ s/^0$/_/;
+    $id = lc($id);
+    return $id;
+}
+
 
 sub _make_uri {
     my $self         = shift;
@@ -336,8 +430,9 @@ sub get_pages {
 
 sub get_page_attachments {
     my $self = shift;
+    my $pname = shift;
     
-    return $self->_get_things('pageattachments');
+    return $self->_get_things( 'pageattachments', pname => $pname );
 }
 
 sub _extend_uri {
@@ -409,7 +504,7 @@ List all pagetags on the specified page
 sub get_pagetags {
     my $self  = shift;
     my $pname = shift;
-
+    $pname = _name_to_id($pname);
     return $self->_get_things( 'pagetags', pname => $pname );
 }
 
@@ -424,7 +519,6 @@ List all the pages that are tagged with 'tag'.
 sub get_taggedpages {
     my $self  = shift;
     my $tag = shift;
-
     return $self->_get_things( 'taggedpages', tag => $tag );
 }
 
@@ -453,14 +547,18 @@ sub _request {
     my $request = HTTP::Request->new( $p{method}, $uri );
     $request->authorization_basic( $self->username, $self->password );
 
-    $request->header( 'Accept'       => $p{accept} ) if $p{accept};
-    $request->header( 'Content-Type' => $p{type} )   if $p{type};
+    $request->header( 'Accept'       => $p{accept} )   if $p{accept};
+    $request->header( 'Content-Type' => $p{type} )     if $p{type};
+    $request->header( 'If-Match'     => $p{if_match} ) if $p{if_match};
     $request->content( $p{content} ) if $p{content};
     my $response = $ua->simple_request($request);
 
-    my $location = $response->header('location');
+    if ($self->http_header_debug) {
+        use Data::Dumper;
+        warn "Code: " . $response->code . "\n" . Dumper $response->headers;
+    }
 
-    return ( $response->code, $response->content, $location );
+    return ( $response->code, $response->content, $response );
 }
 
 =head1 AUTHORS

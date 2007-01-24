@@ -1,5 +1,5 @@
-Socialtext::Resting version 0.01
-================================
+Socialtext::Resting 
+===================
 
 Socialtext::Resting is an interface to the Socialtext REST
 API.  Developers can use the methods in this module to perform
@@ -29,7 +29,7 @@ You can look for information at:
         http://www.socialtext.net/st-rest-docs/index.cgi
 
     Search CPAN
-        http://search.cpan.org/dist/socialtext-resting
+        http://search.cpan.org/dist/Socialtext-Resting
 
 COPYRIGHT AND LICENSE
 

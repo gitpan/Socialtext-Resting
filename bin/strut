@@ -420,7 +420,7 @@ List all tags on the specified page.
 
 =cut
 
-sub list_pagetags {
+sub list_tags {
     printemout(_list_tags());
 }
 

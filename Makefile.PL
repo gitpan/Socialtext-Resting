@@ -12,14 +12,15 @@ my %config = (
         'bin/strut',
     ],
     'PREREQ_PM' => {
-        'URI::Escape'    => 1.31,
-        'LWP::UserAgent' => 0,
-        'HTTP::Request'  => 0,
-        'Class::Field'   => 0,
-        'Readonly'       => 0,
-        'Pod::Usage'     => 0,
-        'App::Options'   => 0,
-	'IPC::Run'       => 0,
+        'URI::Escape'     => 1.31,
+        'LWP::UserAgent'  => 0,
+        'HTTP::Request'   => 0,
+        'Class::Field'    => 0,
+        'Readonly'        => 0,
+        'Pod::Usage'      => 0,
+        'App::Options'    => 0,
+        'IPC::Run'        => 0,
+        'Test::Mock::LWP' => 0,
     },    # e.g., Module::Name => 1.1
     (
         $] >= 5.005
@@ -36,7 +37,7 @@ my %config = (
 my $response = prompt("Perform tests against Socialtext servers?", "y");
 my $files;
 if ($response !~ /^y/i) {
-    $files = join ' ', (grep {$_ !~ /resting/} glob("t/*.t"));
+    $files = join ' ', (grep {$_ !~ /resting\.t/} glob("t/*.t"));
 }
 else {
     $files = 't/*.t';
