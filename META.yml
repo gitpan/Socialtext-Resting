@@ -1,7 +1,7 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Socialtext-Resting
-version:      0.11
+version:      0.12
 version_from: lib/Socialtext/Resting.pm
 installdirs:  site
 requires:
@@ -12,7 +12,7 @@ requires:
     LWP::UserAgent:                0
     Pod::Usage:                    0
     Readonly:                      0
-    Test::Mock::LWP:               0
+    Test::Mock::LWP:               0.04
     URI::Escape:                   1.31
 
 distribution_type: module
