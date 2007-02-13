@@ -10,7 +10,7 @@ use Class::Field 'field';
 
 use Readonly;
 
-our $VERSION = '0.12';
+our $VERSION = '0.15';
 
 =head1 NAME
 
@@ -39,6 +39,9 @@ to the Socialtext REST APIs for use in perl programs.
 
 Readonly my $BASE_URI => '/data/workspaces';
 Readonly my %ROUTES   => (
+    backlinks      => $BASE_URI . '/:ws/pages/:pname/backlinks',
+    breadcrumbs    => $BASE_URI . '/:ws/breadcrumbs',
+    frontlinks     => $BASE_URI . '/:ws/pages/:pname/frontlinks',
     page           => $BASE_URI . '/:ws/pages/:pname',
     pages          => $BASE_URI . '/:ws/pages',
     pagetag        => $BASE_URI . '/:ws/pages/:pname/tags/:tag',
@@ -72,6 +75,7 @@ field 'count';
 field 'query';
 field 'etag_cache' => {};
 field 'http_header_debug';
+field 'response';
 
 =head2 new
 
@@ -92,6 +96,16 @@ sub new {
     my $self     = {@_};
     return bless $self, $class;
 }
+
+=head2 accept
+
+    $Rester->accept($mime_type);
+
+Sets the HTTP Accept header to ask the server for a specific
+representation in future requests.
+
+Standard representations:
+http://www.socialtext.net/st-rest-docs/index.cgi?standard_representations
 
 =head2 get_page 
 
@@ -469,6 +483,21 @@ sub _get_things {
         { ws => $self->workspace, %replacements }
     );
     $uri = $self->_extend_uri($uri);
+
+    # Add query parameters from a
+    if ( exists $replacements{_query} ) {
+        my @params;
+        for my $q ( keys %{ $replacements{_query} } ) {
+            push @params, "$q=" . $replacements{_query}->{$q};
+        }
+        my $query = join( ';', @params );
+        if ( $uri =~ /\?/ ) {
+            $uri .= ";$query";
+        }
+        else {
+            $uri .= "?$query";
+        }
+    }
        
     my ( $status, $content ) = $self->_request(
         uri    => $uri,
@@ -490,6 +519,42 @@ sub _get_things {
 sub get_workspace_tags {
     my $self = shift;
     return $self->_get_things( 'workspacetags' )
+}
+
+=head2 get_backlinks
+
+    $Rester->workspace('wikiname');
+    $Rester->get_backlinks('page_name');
+
+List all backlinks to the specified page 
+
+=cut
+
+sub get_backlinks {
+    my $self  = shift;
+    my $pname = shift;
+    $pname = _name_to_id($pname);
+    return $self->_get_things( 'backlinks', pname => $pname );
+}
+
+=head2 get_frontlinks
+
+    $Rester->workspace('wikiname');
+    $Rester->get_frontlinks('page_name');
+
+List all 'frontlinks' on the specified page 
+
+=cut
+
+sub get_frontlinks {
+    my $self       = shift;
+    my $pname      = shift;
+    my $incipients = shift || 0;
+    $pname = _name_to_id($pname);
+    return $self->_get_things(
+        'frontlinks', pname => $pname,
+        ( $incipients ? ( _query => { incipient => 1 } ) : () )
+    );
 }
 
 =head2 get_pagetags
@@ -522,6 +587,20 @@ sub get_taggedpages {
     return $self->_get_things( 'taggedpages', tag => $tag );
 }
 
+=head2 get_breadcrumbs
+
+    $Rester->get_breadcrumbs('workspace')
+
+Get breadcrumbs for current user in this workspace
+
+=cut
+
+sub get_breadcrumbs {
+    my $self = shift;
+
+    return $self->_get_things('breadcrumbs');
+}
+    
 =head2 get_workspaces
 
     $Rester->get_workspaces();
@@ -546,25 +625,35 @@ sub _request {
     }
     my $request = HTTP::Request->new( $p{method}, $uri );
     $request->authorization_basic( $self->username, $self->password );
-
     $request->header( 'Accept'       => $p{accept} )   if $p{accept};
     $request->header( 'Content-Type' => $p{type} )     if $p{type};
     $request->header( 'If-Match'     => $p{if_match} ) if $p{if_match};
     $request->content( $p{content} ) if $p{content};
-    my $response = $ua->simple_request($request);
+    $self->response( $ua->simple_request($request) );
 
-    if ($self->http_header_debug) {
+    if ( $self->http_header_debug ) {
         use Data::Dumper;
-        warn "Code: " . $response->code . "\n" . Dumper $response->headers;
+        warn "Code: "
+            . $self->response->code . "\n"
+            . Dumper $self->response->headers;
     }
 
-    return ( $response->code, $response->content, $response );
+    # We should refactor to not return these response things
+    return ( $self->response->code, $self->response->content,
+        $self->response );
 }
 
-=head1 AUTHORS
+=head2 response
+
+    my $resp = $Rester->response;
+
+Return the HTTP::Response object from the last request.
+
+=head1 AUTHORS / MAINTAINERS
 
 Chris Dent, C<< <chris.dent@socialtext.com> >>
 Kirsten Jones C<< <kirsten.jones@socialtext.com> >>
+Luke Closs C<< <luke.closs@socialtext.com> >>
 
 =cut
 
