@@ -10,7 +10,7 @@ use Class::Field 'field';
 
 use Readonly;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 =head1 NAME
 
@@ -77,6 +77,8 @@ field 'query';
 field 'etag_cache' => {};
 field 'http_header_debug';
 field 'response';
+field 'json_verbose';
+field 'cookie';
 
 =head2 new
 
@@ -129,6 +131,7 @@ sub get_page {
         'page',
         { pname => $pname, ws => $self->workspace }
     );
+    $uri .= '?verbose=1' if $self->json_verbose;
 
     my ( $status, $content, $response ) = $self->_request(
         uri    => $uri,
@@ -609,7 +612,7 @@ sub get_homepage {
     my $self = shift;
     my $uri = $self->_get_things( 'homepage' );
     my $workspace = $self->workspace;
-    $uri =~ s#.+/data/workspaces/\Q$workspace\E/pages/(.+)#$1#;
+    $uri =~ s#.+/data/workspaces/\Q$workspace\E/pages/(.+)#$1# if $uri;
     return $uri;
 }
 
@@ -748,15 +751,20 @@ sub _request {
     my $self = shift;
     my %p    = @_;
     my $ua   = LWP::UserAgent->new();
-    my $uri  = $self->server . $p{uri};
+    (my $server = $self->server) =~ s#/$##;
+    my $uri  = "$server$p{uri}";
     if ($self->verbose) {
         warn "uri: $uri\n";
     }
+
     my $request = HTTP::Request->new( $p{method}, $uri );
     $request->authorization_basic( $self->username, $self->password );
     $request->header( 'Accept'       => $p{accept} )   if $p{accept};
     $request->header( 'Content-Type' => $p{type} )     if $p{type};
     $request->header( 'If-Match'     => $p{if_match} ) if $p{if_match};
+    if (my $cookie = $self->cookie) {
+        $request->header('cookie' => $cookie);
+    }
     $request->content( $p{content} ) if $p{content};
     $self->response( $ua->simple_request($request) );
 
