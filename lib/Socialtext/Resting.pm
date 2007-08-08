@@ -7,10 +7,11 @@ use URI::Escape;
 use LWP::UserAgent;
 use HTTP::Request;
 use Class::Field 'field';
+use JSON;
 
 use Readonly;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 =head1 NAME
 
@@ -124,12 +125,13 @@ which workspace to operate on.
 sub get_page {
     my $self = shift;
     my $pname = shift;
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     my $accept = $self->accept || 'text/x.socialtext-wiki';
 
+    my $workspace = $self->workspace;
     my $uri = $self->_make_uri(
         'page',
-        { pname => $pname, ws => $self->workspace }
+        { pname => $pname, ws => $workspace }
     );
     $uri .= '?verbose=1' if $self->json_verbose;
 
@@ -140,7 +142,7 @@ sub get_page {
     );
 
     if ( $status == 200 || $status == 404 ) {
-        $self->{etag_cache}{$pname} = $response->header('etag');
+        $self->{etag_cache}{$workspace}{$pname} = $response->header('etag');
         return $content;
     }
     else {
@@ -227,7 +229,7 @@ sub put_pagetag {
     my $pname = shift;
     my $tag   = shift;
 
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     my $uri = $self->_make_uri(
         'pagetag',
         { pname => $pname, ws => $self->workspace, tag => $tag }
@@ -291,7 +293,7 @@ sub delete_pagetag {
     my $pname = shift;
     my $tag   = shift;
 
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     my $uri = $self->_make_uri(
         'pagetag',
         { pname => $pname, ws => $self->workspace, tag => $tag }
@@ -326,7 +328,7 @@ sub post_attachment {
     my $attachment_content = shift;
     my $attachment_type    = shift;
 
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     my $uri = $self->_make_uri(
         'pageattachments',
         {
@@ -370,7 +372,7 @@ sub post_comment {
     my $pname   = shift;
     my $comment = shift;
 
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     my $uri = $self->_make_uri(
         'pagecomments',
         {
@@ -420,9 +422,10 @@ sub put_page {
     my $pname        = shift;
     my $page_content = shift;
 
+    my $workspace = $self->workspace;
     my $uri = $self->_make_uri(
         'page',
-        { pname => $pname, ws => $self->workspace }
+        { pname => $pname, ws => $workspace }
     );
 
     my $type = 'text/x.socialtext-wiki';
@@ -432,8 +435,8 @@ sub put_page {
     }
 
     my %extra_opts;
-    my $page_id = _name_to_id($pname);
-    if (my $prev_etag = $self->{etag_cache}{$page_id}) {
+    my $page_id = name_to_id($pname);
+    if (my $prev_etag = $self->{etag_cache}{$workspace}{$page_id}) {
         $extra_opts{if_match} = $prev_etag;
     }
 
@@ -462,8 +465,24 @@ sub put_page {
 # code by representing name_to_id translation code on both sides
 # of the system. Since it is not used for page PUT, new pages
 # will safely have correct page titles.
-sub _name_to_id {
+#
+# This method is useful for clients, so lets make it public.  In the
+# future, this call could go to the server to reduce code duplication.
+
+=head2 name_to_id
+
+    my $id = $Rester->name_to_id($name);
+    my $id = Socialtext::Resting::name_to_id($name);
+
+Convert a page name into a page ID.  Can be called as a method or 
+as a function.
+
+=cut
+
+sub _name_to_id { name_to_id(@_) }
+sub name_to_id {
     my $id = shift;
+    $id = shift if ref($id); # handle being called as a method
     $id = '' if not defined $id;
     $id =~ s/[^\p{Letter}\p{Number}\p{ConnectorPunctuation}\pM]+/_/g;
     $id =~ s/_+/_/g;
@@ -628,7 +647,7 @@ List all backlinks to the specified page
 sub get_backlinks {
     my $self  = shift;
     my $pname = shift;
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     return $self->_get_things( 'backlinks', pname => $pname );
 }
 
@@ -645,7 +664,7 @@ sub get_frontlinks {
     my $self       = shift;
     my $pname      = shift;
     my $incipients = shift || 0;
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     return $self->_get_things(
         'frontlinks', pname => $pname,
         ( $incipients ? ( _query => { incipient => 1 } ) : () )
@@ -664,7 +683,7 @@ List all pagetags on the specified page
 sub get_pagetags {
     my $self  = shift;
     my $pname = shift;
-    $pname = _name_to_id($pname);
+    $pname = name_to_id($pname);
     return $self->_get_things( 'pagetags', pname => $pname );
 }
 
@@ -751,11 +770,11 @@ sub _request {
     my $self = shift;
     my %p    = @_;
     my $ua   = LWP::UserAgent->new();
-    (my $server = $self->server) =~ s#/$##;
+    my $server = $self->server;
+    die "No server defined!\n" unless $server;
+    $server =~ s#/$##;
     my $uri  = "$server$p{uri}";
-    if ($self->verbose) {
-        warn "uri: $uri\n";
-    }
+    warn "uri: $uri\n" if $self->verbose;
 
     my $request = HTTP::Request->new( $p{method}, $uri );
     $request->authorization_basic( $self->username, $self->password );
