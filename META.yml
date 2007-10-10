@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Socialtext-Resting
-version:             0.22
+version:             0.23
 abstract:            Simple tool to use Socialtext RESTful API
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.36
@@ -10,6 +10,7 @@ requires:
     Class::Field:                  0
     HTTP::Request:                 0
     IPC::Run:                      0
+    JSON:                          0
     LWP::UserAgent:                0
     Pod::Usage:                    0
     Readonly:                      0
