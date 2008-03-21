@@ -7,11 +7,11 @@ use URI::Escape;
 use LWP::UserAgent;
 use HTTP::Request;
 use Class::Field 'field';
-use JSON;
+use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 =head1 NAME
 
@@ -80,6 +80,7 @@ field 'http_header_debug';
 field 'response';
 field 'json_verbose';
 field 'cookie';
+field 'agent_string';
 
 =head2 new
 
@@ -137,8 +138,17 @@ which workspace to operate on.
 sub get_page {
     my $self = shift;
     my $pname = shift;
+    my $paccept;
+
+    if (ref $pname){
+	$paccept = $pname->{accept};
+    }
+    else {
+	$paccept = $self->accept;
+    }
+
     $pname = name_to_id($pname);
-    my $accept = $self->accept || 'text/x.socialtext-wiki';
+    my $accept = $paccept || 'text/x.socialtext-wiki';
 
     my $workspace = $self->workspace;
     my $uri = $self->_make_uri(
@@ -156,7 +166,7 @@ sub get_page {
 
     if ( $status == 200 || $status == 404 ) {
         $self->{etag_cache}{$workspace}{$pname} = $response->header('etag');
-        return jsonToObj($content)
+        return decode_json($content)
             if (($self->accept || '') eq 'perl_hash');
         return $content;
     }
@@ -446,7 +456,7 @@ sub put_page {
     my $type = 'text/x.socialtext-wiki';
     if ( ref $page_content ) {
         $type         = 'application/json';
-        $page_content = JSON->new->objToJson($page_content);
+        $page_content = encode_json($page_content);
     }
 
     my %extra_opts;
@@ -610,7 +620,7 @@ sub _get_things {
         return ( grep defined, ( split "\n", $content ) );
     }
     elsif ( $status == 200 ) {
-        return jsonToObj($content) 
+        return decode_json($content) 
             if (($self->accept || '') eq 'perl_hash');
         return $content;
     }
@@ -809,7 +819,7 @@ sub get_user {
     );
 
     if ( $status == 200 ) {
-        return JSON->new->jsonToObj( $content );
+        return decode_json( $content );
     } elsif ( $status == 404 ) {
         return $content;
     } else {
@@ -834,7 +844,7 @@ sub create_user {
     my $args = shift;
 
     $args->{ username } ||= $args->{ email_address };
-    $args = JSON->new->objToJson($args);
+    $args = encode_json($args);
 
     my ( $status, $content ) = $self->_request(
         uri     => $ROUTES{'users'},
@@ -877,7 +887,7 @@ sub add_user_to_workspace {
 
     $args->{rolename} ||= 'member';
     $args->{send_confirmation_invitation} ||= 0;
-    $args = JSON->new->objToJson($args);
+    $args = encode_json($args);
 
     my ( $status, $content ) = $self->_request(
         uri     => $uri,
@@ -918,7 +928,7 @@ sub get_users_for_workspace {
     );
 
     if ( $status == 200 ) {
-        return @{ JSON->new->jsonToObj( $content ) };
+        return @{ decode_json( $content ) };
     } else {
         die "$status: $content\n";
     }
@@ -927,7 +937,7 @@ sub get_users_for_workspace {
 sub _request {
     my $self = shift;
     my %p    = @_;
-    my $ua   = LWP::UserAgent->new();
+    my $ua   = LWP::UserAgent->new(agent => $self->agent_string);
     my $server = $self->server;
     die "No server defined!\n" unless $server;
     $server =~ s#/$##;
