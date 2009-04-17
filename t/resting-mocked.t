@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Test::More qw/no_plan/;
+use Test::More tests => 135;
 use Test::Mock::LWP;
 
 BEGIN {
@@ -118,6 +118,35 @@ Put_existing_page: {
             ],
             [ 'header' => 'Content-Type', 'text/x.socialtext-wiki' ],
             [ 'content' => 'bar' ],
+        ],
+        resp_calls => [
+            [ 'code' ],
+            [ 'content' ],
+        ],
+    );
+}
+
+
+Put_existing_page_json: {
+    my $rester = new_strutter();
+    $Mock_resp->set_always('code', 204);
+    $rester->put_page(
+        'Foo' => {
+            content => 'bar',
+        }
+    );
+    result_ok(
+        uri  => '/pages/Foo',
+        method => 'PUT',
+        ua_calls => [
+            [ 'simple_request' => $Mock_req ],
+        ],
+        req_calls => [
+            [ 'authorization_basic' => $rester_opts{username}, 
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Content-Type', 'application/json' ],
+            [ 'content' => '{"content":"bar"}' ],
         ],
         resp_calls => [
             [ 'code' ],
@@ -255,10 +284,84 @@ Get_revisions: {
     );
 }
 
+Tag_a_person: {
+    my $rester = new_strutter();
+    $rester->put_persontag('test@example.com', 'foo');
+    result_ok(
+        uri  => 'people/test%40example.com/tags',
+        no_workspace => 1,
+        method => 'POST',
+        ua_calls => [
+            [ 'simple_request' => $Mock_req ],
+        ],
+        req_calls => [
+            [ 'authorization_basic' => $rester_opts{username}, 
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Content-Type' => 'application/json' ],
+            [ 'content' => '{"tag_name":"foo"}' ],
+        ],
+        resp_calls => [
+            [ 'code' ],
+            [ 'content' ],
+        ],
+    );
+}
+
+Get_signals: {
+    my $rester = new_strutter();
+    $Mock_resp->set_always('content', "This\nThat");
+    $rester->get_signals();
+    result_ok(
+        no_workspace => 1,
+        uri  => 'signals',
+        ua_calls => [
+            [ 'simple_request' => $Mock_req ],
+        ],
+        req_calls => [
+            [ 'authorization_basic' => $rester_opts{username}, 
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Accept', 'text/plain' ],
+        ],
+        resp_calls => [
+            [ 'code' ],
+            [ 'content' ],
+        ],
+    );
+}
+
+Post_signal: {
+    my $rester = new_strutter();
+    $Mock_resp->set_always('code', 204);
+    local $Test::Mock::HTTP::Response::Headers{location} = 'waa';
+    $rester->post_signal('O HAI');
+    result_ok(
+        no_workspace => 1,
+        uri  => 'signals',
+        method => 'POST',
+        ua_calls => [
+            [ 'simple_request' => $Mock_req ],
+        ],
+        req_calls => [
+            [ 'authorization_basic' => $rester_opts{username},
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Content-Type', 'application/json' ],
+            [ 'content' => '{"signal":"O HAI"}' ],
+        ],
+        resp_calls => [
+            [ 'code' ],
+            [ 'content' ],
+            [ 'header' => 'location' ],
+        ],
+    );
+}
 
 exit; 
 
 sub result_ok {
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
     my %args = (
         method => 'GET',
         ua_calls => [],
@@ -266,8 +369,10 @@ sub result_ok {
         resp_calls => [],
         @_,
     );
-    my $expected_uri = "$rester_opts{server}/data/workspaces/"
-                       . "$rester_opts{workspace}$args{uri}";
+    my $prefix = $args{no_workspace}
+        ? 'data/'
+        : "data/workspaces/$rester_opts{workspace}";
+    my $expected_uri = "$rester_opts{server}/$prefix$args{uri}";
     is_deeply $Mock_req->new_args, 
               ['HTTP::Request', $args{method}, $expected_uri],
               $expected_uri;
@@ -276,22 +381,21 @@ sub result_ok {
         my ($method, @args) = @$c;
         is_deeply [$Mock_ua->next_call], 
                   [ $method, [ $Mock_ua, @args ]], 
-                  "$method - @args";
+                  "$method ua - @args";
     }
-    is $Mock_ua->next_call, undef;
+    is $Mock_ua->next_call, undef, 'no more ua calls';
     for my $c (@{ $args{req_calls} }) {
         my ($method, @args) = @$c;
         is_deeply [$Mock_req->next_call], 
                   [ $method, [ $Mock_ua, @args ]], 
-                  "$method - @args";
+                  "$method req - @args";
     }
-    is $Mock_req->next_call, undef;
+    is $Mock_req->next_call, undef, 'no more req calls';
     for my $c (@{ $args{resp_calls} }) {
         my ($method, @args) = @$c;
         is_deeply [$Mock_resp->next_call], 
                   [ $method, [ $Mock_ua, @args ]], 
-                  "$method - @args";
+                  "$method resp - @args";
     }
-    is $Mock_resp->next_call, undef;
+    is $Mock_resp->next_call, undef, 'no more resp calls';
 }
-

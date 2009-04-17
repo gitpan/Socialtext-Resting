@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 =head1 NAME
 
@@ -38,32 +38,36 @@ to the Socialtext REST APIs for use in perl programs.
 
 =cut
 
-Readonly my $BASE_URI => '/data/workspaces';
+Readonly my $BASE_URI => '/data';
+Readonly my $BASE_WS_URI => $BASE_URI . '/workspaces';
 Readonly my %ROUTES   => (
-    backlinks      => $BASE_URI . '/:ws/pages/:pname/backlinks',
-    breadcrumbs    => $BASE_URI . '/:ws/breadcrumbs',
-    frontlinks     => $BASE_URI . '/:ws/pages/:pname/frontlinks',
-    page           => $BASE_URI . '/:ws/pages/:pname',
-    pages          => $BASE_URI . '/:ws/pages',
-    pagetag        => $BASE_URI . '/:ws/pages/:pname/tags/:tag',
-    pagetags       => $BASE_URI . '/:ws/pages/:pname/tags',
-    pagecomments   => $BASE_URI . '/:ws/pages/:pname/comments',
-    pageattachment => $BASE_URI
+    backlinks      => $BASE_WS_URI . '/:ws/pages/:pname/backlinks',
+    breadcrumbs    => $BASE_WS_URI . '/:ws/breadcrumbs',
+    frontlinks     => $BASE_WS_URI . '/:ws/pages/:pname/frontlinks',
+    page           => $BASE_WS_URI . '/:ws/pages/:pname',
+    pages          => $BASE_WS_URI . '/:ws/pages',
+    pagetag        => $BASE_WS_URI . '/:ws/pages/:pname/tags/:tag',
+    pagetags       => $BASE_WS_URI . '/:ws/pages/:pname/tags',
+    pagecomments   => $BASE_WS_URI . '/:ws/pages/:pname/comments',
+    pageattachment => $BASE_WS_URI
         . '/:ws/pages/:pname/attachments/:attachment_id',
-    pageattachments      => $BASE_URI . '/:ws/pages/:pname/attachments',
-    revisions            => $BASE_URI . '/:ws/pages/:pname/revisions',
-    taggedpages          => $BASE_URI . '/:ws/tags/:tag/pages',
-    workspace            => $BASE_URI . '/:ws',
-    workspaces           => $BASE_URI,
-    workspacetag         => $BASE_URI . '/:ws/tags/:tag',
-    workspacetags        => $BASE_URI . '/:ws/tags',
-    workspaceattachment  => $BASE_URI . '/:ws/attachments/:attachment_id',
-    workspaceattachments => $BASE_URI . '/:ws/attachments',
-    workspaceuser        => $BASE_URI . '/:ws/users/:user_id',
-    workspaceusers       => $BASE_URI . '/:ws/users',
+    pageattachments      => $BASE_WS_URI . '/:ws/pages/:pname/attachments',
+    revisions            => $BASE_WS_URI . '/:ws/pages/:pname/revisions',
+    taggedpages          => $BASE_WS_URI . '/:ws/tags/:tag/pages',
+    workspace            => $BASE_WS_URI . '/:ws',
+    workspaces           => $BASE_WS_URI,
+    workspacetag         => $BASE_WS_URI . '/:ws/tags/:tag',
+    workspacetags        => $BASE_WS_URI . '/:ws/tags',
+    workspaceattachment  => $BASE_WS_URI . '/:ws/attachments/:attachment_id',
+    workspaceattachments => $BASE_WS_URI . '/:ws/attachments',
+    workspaceuser        => $BASE_WS_URI . '/:ws/users/:user_id',
+    workspaceusers       => $BASE_WS_URI . '/:ws/users',
     user                 => '/data/users/:user_id',
     users                => '/data/users',
-    homepage             => $BASE_URI . '/:ws/homepage',
+    homepage             => $BASE_WS_URI . '/:ws/homepage',
+    person               => $BASE_URI . '/people/:pname',
+    person_tag           => $BASE_URI . '/people/:pname/tags',
+    signals              => $BASE_URI . '/signals',
 );
 
 field 'workspace';
@@ -624,12 +628,13 @@ sub _get_things {
         for my $q ( keys %{ $replacements{_query} } ) {
             push @params, "$q=" . $replacements{_query}->{$q};
         }
-        my $query = join( ';', @params );
-        if ( $uri =~ /\?/ ) {
-            $uri .= ";$query";
-        }
-        else {
-            $uri .= "?$query";
+        if (my $query = join( ';', @params )) {
+            if ( $uri =~ /\?/ ) {
+                $uri .= ";$query";
+            }
+            else {
+                $uri .= "?$query";
+            }
         }
     }
 
@@ -683,7 +688,7 @@ sub get_homepage {
     my $self = shift;
     my $uri = $self->_get_things( 'homepage' );
     my $workspace = $self->workspace;
-    $uri =~ s#.+/data/workspaces/\Q$workspace\E/pages/(.+)#$1# if $uri;
+    $uri =~ s#.*/data/workspaces/\Q$workspace\E/pages/(.+)#$1# if $uri;
     return $uri;
 }
 
@@ -973,6 +978,98 @@ sub get_users_for_workspace {
     if ( $status == 200 ) {
         return @{ decode_json( $content ) };
     } else {
+        die "$status: $content\n";
+    }
+}
+
+=head2 put_persontag
+
+    $Rester->put_persontag( $person, $tag )
+
+Tag a person.
+
+=cut
+
+sub put_persontag {
+    my $self = shift;
+    my $person = shift;
+    my $tag = shift;
+
+    my $uri = $self->_make_uri(
+        'person_tag',
+        { pname => $person }
+    );
+    
+    my ( $status, $content ) = $self->_request(
+        uri     => $uri,
+        method  => 'POST',
+        type    => 'application/json',
+        content => encode_json({ tag_name => $tag }),
+    );
+
+    return if $status == 200;
+    die "$status: $content\n";
+}
+
+
+=head2 get_person
+
+    $Rester->get_person();
+
+Retrieves a person.
+
+=cut
+
+sub get_person {
+    my $self = shift;
+    my $identifier = shift || $self->username;
+
+    return $self->_get_things('person', pname => $identifier );
+}
+
+
+=head2 get_signals
+
+    $Rester->get_signals();
+
+Retrieves the list of signals.
+
+=cut
+
+sub get_signals {
+    my $self = shift;
+    my %opts = @_;
+
+    return $self->_get_things('signals', _query => \%opts);
+}
+
+=head2 post_signal
+
+    $Rester->post_signal('O HAI');
+
+Posts a signal.
+
+=cut
+
+sub post_signal {
+    my $self = shift;
+    my $text = shift;
+
+    my $uri = $self->_make_uri('signals');
+    my ( $status, $content, $response ) = $self->_request(
+        uri     => $uri,
+        method  => 'POST',
+        type    => "application/json",
+        content => encode_json( { signal => $text } ),
+    );
+
+    my $location = $response->header('location');
+    $location = URI::Escape::uri_unescape($1);
+
+    if ( $status == 204 || $status == 201 ) {
+        return $location;
+    }
+    else {
         die "$status: $content\n";
     }
 }
