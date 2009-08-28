@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 =head1 NAME
 
@@ -48,6 +48,7 @@ Readonly my %ROUTES   => (
     pages          => $BASE_WS_URI . '/:ws/pages',
     pagetag        => $BASE_WS_URI . '/:ws/pages/:pname/tags/:tag',
     pagetags       => $BASE_WS_URI . '/:ws/pages/:pname/tags',
+    pagetaghistory => $BASE_WS_URI . '/:ws/pages/:pname/taghistory',
     pagecomments   => $BASE_WS_URI . '/:ws/pages/:pname/comments',
     pageattachment => $BASE_WS_URI
         . '/:ws/pages/:pname/attachments/:attachment_id',
@@ -68,11 +69,13 @@ Readonly my %ROUTES   => (
     person               => $BASE_URI . '/people/:pname',
     person_tag           => $BASE_URI . '/people/:pname/tags',
     signals              => $BASE_URI . '/signals',
+    webhooks             => $BASE_URI . '/webhooks',
 );
 
 field 'workspace';
 field 'username';
 field 'password';
+field 'user_cookie';
 field 'server';
 field 'verbose';
 field 'accept';
@@ -95,8 +98,15 @@ field 'agent_string';
         server   => $opts{server},
     );
 
+    or
+
+    my $Rester = Socialtext::Resting->new(
+        user_cookie => $opts{user_cookie},
+        server      => $opts{server},
+    );
+
 Creates a Socialtext::Resting object for the specified
-server/user/password combination.
+server/user/password, or server/cookie combination.
 
 =cut
 
@@ -587,6 +597,22 @@ sub get_revisions {
     return $self->_get_things( 'revisions', pname => $pname );
 }
 
+=head2 get_taghistory
+
+    $Rester->workspace('wikiname');
+    $Rester->get_taghistory($page)
+
+Get a history, by revision, of all tags for a page.
+
+=cut
+
+sub get_taghistory {
+    my $self = shift;
+    my $pname = shift;
+
+    return $self->_get_things( 'pagetaghistory', pname => $pname );
+}
+
 sub _extend_uri {
     my $self = shift;
     my $uri = shift;
@@ -1074,6 +1100,37 @@ sub post_signal {
     }
 }
 
+=head2 put_webhook
+
+    $Rester->put_webhook( %args )
+
+Creates a webhook.  Args will be encoded as JSON and put up.
+
+=cut
+
+sub put_webhook {
+    my $self = shift;
+    my %args = @_;
+
+    my $uri = $self->_make_uri('webhooks');
+    my ( $status, $content, $response ) = $self->_request(
+        uri     => $uri,
+        method  => 'PUT',
+        type    => "application/json",
+        content => encode_json( \%args ),
+    );
+
+    my $location = $response->header('location');
+    $location = URI::Escape::uri_unescape($1);
+
+    if ( $status == 204 || $status == 201 ) {
+        return $location;
+    }
+    else {
+        die "$status: $content\n";
+    }
+}
+
 sub _request {
     my $self = shift;
     my %p    = @_;
@@ -1085,7 +1142,11 @@ sub _request {
     warn "uri: $uri\n" if $self->verbose;
 
     my $request = HTTP::Request->new( $p{method}, $uri );
-    $request->authorization_basic( $self->username, $self->password );
+    if ( $self->user_cookie ) {
+        $request->header( 'Cookie' => 'NLW-user=' . $self->user_cookie );
+    } else {
+        $request->authorization_basic( $self->username, $self->password );
+    }
     $request->header( 'Accept'       => $p{accept} )   if $p{accept};
     $request->header( 'Content-Type' => $p{type} )     if $p{type};
     $request->header( 'If-Match'     => $p{if_match} ) if $p{if_match};
