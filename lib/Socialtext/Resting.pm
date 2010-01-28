@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 =head1 NAME
 
@@ -66,8 +66,10 @@ Readonly my %ROUTES   => (
     user                 => '/data/users/:user_id',
     users                => '/data/users',
     homepage             => $BASE_WS_URI . '/:ws/homepage',
+    people               => $BASE_URI . '/people',
     person               => $BASE_URI . '/people/:pname',
     person_tag           => $BASE_URI . '/people/:pname/tags',
+    profile_photo        => $BASE_URI . '/people/:pname/photo',
     signals              => $BASE_URI . '/signals',
     webhooks             => $BASE_URI . '/webhooks',
 );
@@ -1037,6 +1039,37 @@ sub put_persontag {
     die "$status: $content\n";
 }
 
+=head2 get_people
+
+    $Rester->get_people();
+
+Retrieves all people.
+
+=cut
+
+sub get_people {
+    my ($self, %opts) = @_;
+    return $self->_get_things('people', _query => \%opts);
+}
+
+sub get_profile_photo {
+    my $self = shift;
+    my $pname = shift;
+
+    my $uri = $self->_make_uri( 'profile_photo', { pname => $pname });
+
+    my ( $status, $content, $response ) = $self->_request(
+        uri    => $uri,
+        method => 'GET',
+    );
+
+    if ( $status == 200 ) {
+        return $content;
+    }
+    else {
+        die "$status: $content\n";
+    }
+}
 
 =head2 get_person
 
@@ -1150,6 +1183,12 @@ sub _request {
     $request->header( 'Accept'       => $p{accept} )   if $p{accept};
     $request->header( 'Content-Type' => $p{type} )     if $p{type};
     $request->header( 'If-Match'     => $p{if_match} ) if $p{if_match};
+    if ($p{method} eq 'PUT') {
+        my $content_len = 0;
+        $content_len = do { use bytes; length $p{content} } if $p{content};
+        $request->header( 'Content-Length' => $content_len );
+    }
+
     if (my $cookie = $self->cookie) {
         $request->header('cookie' => $cookie);
     }
