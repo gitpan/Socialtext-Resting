@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Test::More tests => 140;
+use Test::More tests => 160;
 use Test::Mock::LWP;
 
 BEGIN {
@@ -336,6 +336,29 @@ Get_signals: {
     );
 }
 
+Get_signals_w_args: {
+    my $rester = new_strutter();
+    $Mock_resp->set_always('content', "This\nThat");
+    $rester->get_signals(account_id => 2);
+    result_ok(
+        no_workspace => 1,
+        uri  => 'signals?account_id=2',
+        ua_calls => [
+            [ 'simple_request' => $Mock_req ],
+        ],
+        req_calls => [
+            [ 'authorization_basic' => $rester_opts{username}, 
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Accept', 'text/plain' ],
+        ],
+        resp_calls => [
+            [ 'code' ],
+            [ 'content' ],
+        ],
+    );
+}
+
 Post_signal: {
     my $rester = new_strutter();
     $Mock_resp->set_always('code', 204);
@@ -354,6 +377,34 @@ Post_signal: {
             ],
             [ 'header' => 'Content-Type', 'application/json' ],
             [ 'content' => '{"signal":"O HAI"}' ],
+        ],
+        resp_calls => [
+            [ 'code' ],
+            [ 'content' ],
+            [ 'header' => 'location' ],
+        ],
+    );
+}
+
+Post_signal_to_group: {
+    my $rester = new_strutter();
+    $Mock_resp->set_always('code', 204);
+    local $Test::Mock::HTTP::Response::Headers{location} = 'waa';
+    $rester->post_signal('O HAI', group_id => 42, account_ids => [2,3,4]);
+    result_ok(
+        no_workspace => 1,
+        uri  => 'signals',
+        method => 'POST',
+        ua_calls => [
+            [ 'simple_request' => $Mock_req ],
+        ],
+        req_calls => [
+            [ 'authorization_basic' => $rester_opts{username},
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Content-Type', 'application/json' ],
+            [ 'content' =>
+                '{"signal":"O HAI","group_ids":[42],"account_ids":[2,3,4]}' ],
         ],
         resp_calls => [
             [ 'code' ],

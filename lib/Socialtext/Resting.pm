@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 =head1 NAME
 
@@ -1090,8 +1090,12 @@ sub get_person {
 =head2 get_signals
 
     $Rester->get_signals();
+    $Rester->get_signals(group_id => 42);
+    $Rester->get_signals(account_id => 2);
 
 Retrieves the list of signals.
+
+Optional arguments are passed as query paramaters.
 
 =cut
 
@@ -1105,21 +1109,36 @@ sub get_signals {
 =head2 post_signal
 
     $Rester->post_signal('O HAI');
+    $Rester->post_signal('O HAI', group_id => 42);
+    $Rester->post_signal('O HAI', group_ids => [2,3,4]);
+    $Rester->post_signal('O HAI', account_id => 42);
+    $Rester->post_signal('O HAI', account_ids => [2,3,4]);
 
 Posts a signal.
+
+Optional C<account_ids> and C<group_ids> arguments for targetting the signal.
 
 =cut
 
 sub post_signal {
     my $self = shift;
     my $text = shift;
+    my %args = @_;
+
+    my %sig = ( signal => $text );
+
+    for my $k (qw(account_id group_id)) {
+        my @ids = @{ $args{$k.'s'} || [] };
+        push @ids, $args{$k} if $args{$k}; # must be non-zero
+        $sig{$k.'s'} = \@ids if @ids;
+    }
 
     my $uri = $self->_make_uri('signals');
     my ( $status, $content, $response ) = $self->_request(
         uri     => $uri,
         method  => 'POST',
         type    => "application/json",
-        content => encode_json( { signal => $text } ),
+        content => encode_json( \%sig ),
     );
 
     my $location = $response->header('location');
@@ -1215,12 +1234,17 @@ Return the HTTP::Response object from the last request.
 
 =head1 AUTHORS / MAINTAINERS
 
-Chris Dent, C<< <chris.dent@socialtext.com> >>
-Kirsten Jones C<< <kirsten.jones@socialtext.com> >>
 Luke Closs C<< <luke.closs@socialtext.com> >>
+
 Shawn Devlin C<< <shawn.devlin@socialtext.com> >>
 
-=head2 OTHER CONTRIBUTORS
+Jeremy Stashewsky C<< <jeremy.stashewsky@socialtext.com> >>
+
+=head2 CONTRIBUTORS
+
+Chris Dent
+
+Kirsten Jones
 
 Michele Berg - get_revisions()
 
