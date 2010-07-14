@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 =head1 NAME
 
@@ -1123,7 +1123,9 @@ Optional C<account_ids> and C<group_ids> arguments for targetting the signal.
 
 Optional C<in_reply_to_id> for specifying a signal_id this signal is in reply to.
 
-Optional C<annotations> for attaching an hash reference to the signal as the annotation.
+Optional C<annotations> to annotate the signal. C<annotations> should be an array
+ref containing hashrefs that have one key (the annotation type) and a value that is
+a hashref containing key/value pairs.
 
 =cut
 

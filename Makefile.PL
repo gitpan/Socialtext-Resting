@@ -9,7 +9,7 @@ my %config = (
     'VERSION_FROM' => 'lib/Socialtext/Resting.pm',
     'PREREQ_PRINT' => 1,
     'EXE_FILES'    => [
-        'bin/strut',
+        'bin/strut', 'bin/st-webhook',
     ],
     'PREREQ_PM' => {
         'URI::Escape'     => 1.31,
