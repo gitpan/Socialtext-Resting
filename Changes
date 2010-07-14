@@ -1,3 +1,6 @@
+0.32 - Wed Jul 14 12:43:34 PDT 2010
+ - Use a more correct HTTP verb (POST) when creating a webhook.
+
 0.31 - Wed Jul 14 11:32:33 PDT 2010
  - Add support for sending signals in reply to another signal.
  - Add support for sending signals with annotations.

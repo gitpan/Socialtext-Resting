@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 =head1 NAME
 
@@ -1164,22 +1164,22 @@ sub post_signal {
     }
 }
 
-=head2 put_webhook
+=head2 post_webhook
 
-    $Rester->put_webhook( %args )
+    $Rester->post_webhook( %args )
 
 Creates a webhook.  Args will be encoded as JSON and put up.
 
 =cut
 
-sub put_webhook {
+sub post_webhook {
     my $self = shift;
     my %args = @_;
 
     my $uri = $self->_make_uri('webhooks');
     my ( $status, $content, $response ) = $self->_request(
         uri     => $uri,
-        method  => 'PUT',
+        method  => 'POST',
         type    => "application/json",
         content => encode_json( \%args ),
     );
