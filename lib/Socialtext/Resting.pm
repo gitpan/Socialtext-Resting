@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 =head1 NAME
 
@@ -72,6 +72,7 @@ Readonly my %ROUTES   => (
     profile_photo        => $BASE_URI . '/people/:pname/photo',
     signals              => $BASE_URI . '/signals',
     webhooks             => $BASE_URI . '/webhooks',
+    webhook              => $BASE_URI . '/webhooks/:id',
 );
 
 field 'workspace';
@@ -91,6 +92,7 @@ field 'response';
 field 'json_verbose';
 field 'cookie';
 field 'agent_string';
+field 'on_behalf_of';
 
 =head2 new
 
@@ -1113,10 +1115,15 @@ sub get_signals {
     $Rester->post_signal('O HAI', group_ids => [2,3,4]);
     $Rester->post_signal('O HAI', account_id => 42);
     $Rester->post_signal('O HAI', account_ids => [2,3,4]);
+    $Rester->post_signal('O HAI', in_reply_to_id => 142);
 
 Posts a signal.
 
 Optional C<account_ids> and C<group_ids> arguments for targetting the signal.
+
+Optional C<in_reply_to_id> for specifying a signal_id this signal is in reply to.
+
+Optional C<annotations> for attaching an hash reference to the signal as the annotation.
 
 =cut
 
@@ -1131,6 +1138,11 @@ sub post_signal {
         my @ids = @{ $args{$k.'s'} || [] };
         push @ids, $args{$k} if $args{$k}; # must be non-zero
         $sig{$k.'s'} = \@ids if @ids;
+    }
+
+    for my $k (qw(in_reply_to annotations attachments)) {
+        next unless exists $args{$k};
+        $sig{$k} = $args{$k};
     }
 
     my $uri = $self->_make_uri('signals');
@@ -1172,11 +1184,61 @@ sub put_webhook {
         content => encode_json( \%args ),
     );
 
-    my $location = $response->header('location');
-    $location = URI::Escape::uri_unescape($1);
-
     if ( $status == 204 || $status == 201 ) {
-        return $location;
+        return $response->header('Location');
+    }
+    else {
+        die "$status: $content\n";
+    }
+}
+
+=head2 get_webhooks
+
+    my $hooks = $Rester->get_webhooks();
+
+Returns an arrayref containing hashrefs of each webhook on the server.
+
+=cut
+
+sub get_webhooks {
+    my $self = shift;
+
+    my $uri = $self->_make_uri('webhooks');
+    my ( $status, $content, $response ) = $self->_request(
+        uri     => $uri,
+        method  => 'GET',
+        type    => "application/json",
+    );
+
+    if ( $status == 200 ) {
+        return decode_json($content);
+    }
+    else {
+        die "$status: $content\n";
+    }
+}
+
+=head2 delete_webhook
+
+    $Rester->delete_webhook( id => $webhook_id );
+
+Deletes the specified webhook.
+
+=cut
+
+sub delete_webhook {
+    my $self = shift;
+    my %args = @_;
+    die "id is mandatory" unless $args{id};
+
+    my $uri = $self->_make_uri('webhook', {id => $args{id}});
+    my ( $status, $content, $response ) = $self->_request(
+        uri     => $uri,
+        method  => 'DELETE',
+    );
+
+    if ( $status == 204 ) {
+        return;
     }
     else {
         die "$status: $content\n";
@@ -1202,6 +1264,8 @@ sub _request {
     $request->header( 'Accept'       => $p{accept} )   if $p{accept};
     $request->header( 'Content-Type' => $p{type} )     if $p{type};
     $request->header( 'If-Match'     => $p{if_match} ) if $p{if_match};
+    $request->header( 'X-On-Behalf-Of' => $self->on_behalf_of ) if $self->on_behalf_of;
+
     if ($p{method} eq 'PUT') {
         my $content_len = 0;
         $content_len = do { use bytes; length $p{content} } if $p{content};
