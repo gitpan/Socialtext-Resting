@@ -1,3 +1,6 @@
+0.34 - Fri Jul 16 09:35:49 PDT 2010
+ - Include st-webhook in the MANIFEST. Doh.
+
 0.33 - Wed Jul 14 15:14:40 PDT 2010
  - Make sure to install st-webhook
 
