@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 =head1 NAME
 
@@ -53,6 +53,7 @@ Readonly my %ROUTES   => (
     pageattachment => $BASE_WS_URI
         . '/:ws/pages/:pname/attachments/:attachment_id',
     pageattachments      => $BASE_WS_URI . '/:ws/pages/:pname/attachments',
+    sheetcells           => $BASE_WS_URI . '/:ws/sheets/:pname/cells/:cellid',
     revisions            => $BASE_WS_URI . '/:ws/pages/:pname/revisions',
     taggedpages          => $BASE_WS_URI . '/:ws/tags/:tag/pages',
     workspace            => $BASE_WS_URI . '/:ws',
@@ -84,6 +85,7 @@ field 'verbose';
 field 'accept';
 field 'filter';
 field 'order';
+field 'offset';
 field 'count';
 field 'query';
 field 'etag_cache' => {};
@@ -586,6 +588,23 @@ sub get_page_attachments {
     return $self->_get_things( 'pageattachments', pname => $pname );
 }
 
+=head2 get_sheet_cell
+
+    $Rester->get_sheet_cell($page, $cellid)
+
+Get the value of a cell in a spreadsheet.
+
+=cut
+
+sub get_sheet_cell {
+    my $self = shift;
+    my $pname = shift;
+    my $cellid = shift;
+
+    return $self->_get_things('sheetcells', pname => $pname,
+        cellid => $cellid);
+}
+
 =head2 get_revisions
 
     $Rester->get_revisions($page)
@@ -630,6 +649,9 @@ sub _extend_uri {
     }
     if ( $self->order ) {
         push (@extend, "order=" . $self->order);
+    }
+    if ( $self->offset ) {
+        push (@extend, "offset=" . $self->offset);
     }
     if ( $self->count ) {
         push (@extend, "count=" . $self->count);

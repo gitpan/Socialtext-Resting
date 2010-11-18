@@ -17,10 +17,12 @@ GetOptions( \%args,
     'id=s',
     'account-id=s',
     'workspace-id=s',
+    'group-id=s',
 );
 
 $args{account_id}   = delete $args{'account-id'}   if $args{'account-id'};
 $args{workspace_id} = delete $args{'workspace-id'} if $args{'workspace-id'};
+$args{group_id}     = delete $args{'group-id'}     if $args{'group-id'};
 
 my $command = shift || usage();
 my %commands = (

@@ -105,7 +105,7 @@ sub new_strutter {
     return Socialtext::Resting->new(
         username  => $strut_user,
         password  => 'dozing',
-        server    => 'http://www.socialtext.net',
+        server    => 'https://www.socialtext.net',
         workspace => 'st-rest-test',
     );
 }

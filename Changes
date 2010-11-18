@@ -1,3 +1,8 @@
+0.35 - Wed Nov 17 20:04:07 PST 2010
+ - adds a --group-id option to the command line
+ - adds a ->offset method for requests
+ - adds a ->get_sheet_cell for Socialcalc sheet read API
+
 0.34 - Fri Jul 16 09:35:49 PDT 2010
  - Include st-webhook in the MANIFEST. Doh.
 
