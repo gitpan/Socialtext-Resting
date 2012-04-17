@@ -22,6 +22,7 @@ my %config = (
         'IPC::Run'        => 0,
         'Test::Mock::LWP' => '0.05',
         'JSON::XS'        => '2.1',
+        'Net::SSLeay'     => 0,
     },
     (
         $] >= 5.005

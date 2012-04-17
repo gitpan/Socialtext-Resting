@@ -1,4 +1,9 @@
-0.35 - Wed Nov 17 20:04:07 PST 2010
+0.36 - not yet released
+ - Added a dep on Net::SSLeay since we now require https for tests
+ - Added ->delete_page
+ - Added ->get_persontags
+
+0.35 - Mon Nov 29 16:48:45 PST 2010
  - adds a --group-id option to the command line
  - adds a ->offset method for requests
  - adds a ->get_sheet_cell for Socialcalc sheet read API

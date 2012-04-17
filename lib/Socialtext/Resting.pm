@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 =head1 NAME
 
@@ -70,7 +70,7 @@ Readonly my %ROUTES   => (
     people               => $BASE_URI . '/people',
     person               => $BASE_URI . '/people/:pname',
     person_tag           => $BASE_URI . '/people/:pname/tags',
-    profile_photo        => $BASE_URI . '/people/:pname/photo',
+    profile_photo        => $BASE_URI . '/people/:pname/photo/:version',
     signals              => $BASE_URI . '/signals',
     webhooks             => $BASE_URI . '/webhooks',
     webhook              => $BASE_URI . '/webhooks/:id',
@@ -463,6 +463,7 @@ will be created, but will not be added to the workspace.
 =back
 
 =cut
+
 sub put_page {
     my $self         = shift;
     my $pname        = shift;
@@ -495,6 +496,40 @@ sub put_page {
     );
 
     if ( $status == 204 || $status == 201 ) {
+        return $content;
+    }
+    else {
+        die "$status: $content\n";
+    }
+}
+
+=head2 delete_page
+
+    $Rester->workspace('wikiname');
+    $Rester->delete_page('page_name');
+
+Delete the specified page.
+
+=cut
+
+sub delete_page {
+    my $self         = shift;
+    my $pname        = shift;
+
+    my $workspace = $self->workspace;
+    my $uri = $self->_make_uri(
+        'page',
+        { pname => $pname, ws => $workspace }
+    );
+
+    my ( $status, $content ) = $self->_request(
+        uri     => $uri,
+        method  => 'DELETE',
+        type    => 'application/json',
+        content => '{}',
+    );
+
+    if ( $status == 204 ) {
         return $content;
     }
     else {
@@ -590,7 +625,7 @@ sub get_page_attachments {
 
 =head2 get_sheet_cell
 
-    $Rester->get_sheet_cell($page, $cellid)
+    $Rester->get_sheet_cell($page_id, $cellid)
 
 Get the value of a cell in a spreadsheet.
 
@@ -1063,6 +1098,21 @@ sub put_persontag {
     die "$status: $content\n";
 }
 
+=head2 get_persontags
+
+    $Rester->get_persontags($person);
+
+Retrieves all tags for a person
+
+=cut
+
+sub get_persontags {
+    my ($self, $person, %opts) = @_;
+    return $self->_get_things('person_tag',
+        pname => $person,
+        _query => \%opts);
+}
+
 =head2 get_people
 
     $Rester->get_people();
@@ -1077,10 +1127,14 @@ sub get_people {
 }
 
 sub get_profile_photo {
-    my $self = shift;
-    my $pname = shift;
+    my $self    = shift;
+    my $pname   = shift;
+    my $version = shift;
 
-    my $uri = $self->_make_uri( 'profile_photo', { pname => $pname });
+    my $uri = $self->_make_uri( 'profile_photo', {
+        pname => $pname,
+        version => $version || 'max',
+    });
 
     my ( $status, $content, $response ) = $self->_request(
         uri    => $uri,
@@ -1137,7 +1191,7 @@ sub get_signals {
     $Rester->post_signal('O HAI', group_ids => [2,3,4]);
     $Rester->post_signal('O HAI', account_id => 42);
     $Rester->post_signal('O HAI', account_ids => [2,3,4]);
-    $Rester->post_signal('O HAI', in_reply_to_id => 142);
+    $Rester->post_signal('O HAI', in_reply_to => { signal_id => 142 });
 
 Posts a signal.
 

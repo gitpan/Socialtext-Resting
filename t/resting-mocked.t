@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Test::More tests => 160;
+use Test::More tests => 177;
 use Test::Mock::LWP;
 
 BEGIN {
@@ -414,6 +414,40 @@ Post_signal_to_group: {
     );
 }
 
+Delete_page: {
+    my $rester = new_strutter();
+    $Mock_resp->set_always('code', 201);
+    $rester->put_page('Foo', 'bar');
+    $Mock_resp->set_always('code', 204);
+    $rester->delete_page('Foo');
+    result_ok(
+        uri  => '/pages/Foo',
+        method => 'DELETE',
+        ua_calls => [
+            [ 'simple_request' => $Mock_req ],
+            [ 'simple_request' => $Mock_req ],
+        ],
+        req_calls => [
+            [ 'authorization_basic' => $rester_opts{username}, 
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Content-Type', 'text/x.socialtext-wiki' ],
+            [ 'header' => 'Content-Length' => 3 ],
+            [ 'content' => 'bar' ],
+            [ 'authorization_basic' => $rester_opts{username}, 
+              $rester_opts{password},
+            ],
+            [ 'header' => 'Content-Type', 'application/json' ],
+            [ 'content' => '{}' ],
+        ],
+        resp_calls => [
+            [ 'code' ],
+            [ 'content' ],
+            [ 'code' ],
+            [ 'content' ],
+        ],
+    );
+}
 exit; 
 
 sub result_ok {
@@ -455,3 +489,4 @@ sub result_ok {
     }
     is $Mock_resp->next_call, undef, 'no more resp calls';
 }
+
