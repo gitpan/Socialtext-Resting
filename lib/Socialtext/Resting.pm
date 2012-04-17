@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 =head1 NAME
 
@@ -1376,13 +1376,17 @@ Return the HTTP::Response object from the last request.
 
 =head1 AUTHORS / MAINTAINERS
 
-Luke Closs C<< <luke.closs@socialtext.com> >>
-
 Shawn Devlin C<< <shawn.devlin@socialtext.com> >>
 
-Jeremy Stashewsky C<< <jeremy.stashewsky@socialtext.com> >>
+Kevin Jones C<< <kevin.jones@socialtext.com> >>
+
+Brandon Noard C<< <brandon.noard@socialtext.com> >>
 
 =head2 CONTRIBUTORS
+
+Luke Closs
+
+Jeremy Stashewsky
 
 Chris Dent
 
