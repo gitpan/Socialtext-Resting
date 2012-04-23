@@ -1,5 +1,4 @@
 use Test::More;
-use Socialtext::Resting::Getopt qw/get_rester/;
 use IPC::Run;
 
 use strict;
@@ -7,6 +6,14 @@ use warnings;
 
 # Put the page
 Setup: {
+    eval { require Socialtext::Resting::Getopt };
+    if ($@) {
+        plan skip_all => 'No Socialtext::Resting::Getopt';
+        exit;
+    }
+
+    Socialtext::Resting::Getopt->import('get_rester');
+
     my $r = get_rester(workspace => 'st-rest-test');
     eval { $r->put_page("Test page", "This is a\nfile thing here\n")};
     if ($@) {

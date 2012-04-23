@@ -11,7 +11,7 @@ use JSON::XS;
 
 use Readonly;
 
-our $VERSION = '0.37';
+our $VERSION = '0.38';
 
 =head1 NAME
 
@@ -45,6 +45,7 @@ Readonly my %ROUTES   => (
     breadcrumbs    => $BASE_WS_URI . '/:ws/breadcrumbs',
     frontlinks     => $BASE_WS_URI . '/:ws/pages/:pname/frontlinks',
     page           => $BASE_WS_URI . '/:ws/pages/:pname',
+    pagerevision   => $BASE_WS_URI . '/:ws/pages/:pname/revisions/:revisionid',
     pages          => $BASE_WS_URI . '/:ws/pages',
     pagetag        => $BASE_WS_URI . '/:ws/pages/:pname/tags/:tag',
     pagetags       => $BASE_WS_URI . '/:ws/pages/:pname/tags',
@@ -95,6 +96,8 @@ field 'json_verbose';
 field 'cookie';
 field 'agent_string';
 field 'on_behalf_of';
+field 'additional_headers' => {};
+field 'siteminder';
 
 =head2 new
 
@@ -159,22 +162,50 @@ which workspace to operate on.
 sub get_page {
     my $self = shift;
     my $pname = shift;
-    my $paccept;
 
-    if (ref $pname){
-	$paccept = $pname->{accept};
-    }
-    else {
-	$paccept = $self->accept;
-    }
+    return $self->_get_page_or_revision(
+        'page',
+        $pname,
+    );
+}
+
+=head2 get_page_revision
+
+    $Rester->workspace('wikiname');
+    $Rester->get_page_revision('page_name', 'revision_id');
+
+Retrieves the content of the specified page revision.  Note that the workspace
+method needs to be called first to specify which workspace to operate on.
+
+=cut
+
+sub get_page_revision {
+    my $self = shift;
+    my $pname = shift;
+    my $revisionid = shift;
+
+    return $self->_get_page_or_revision(
+        'pagerevision',
+        $pname,
+        $revisionid,
+    );
+}
+
+sub _get_page_or_revision {
+    my $self = shift;
+    my $route = shift;
+    my $pname = shift;
+    my $revisionid = shift;
+
+    my $paccept = (ref $pname) ? $pname->{accept} : $self->accept;
 
     $pname = name_to_id($pname);
     my $accept = $paccept || 'text/x.socialtext-wiki';
 
     my $workspace = $self->workspace;
     my $uri = $self->_make_uri(
-        'page',
-        { pname => $pname, ws => $workspace }
+        $route,
+        { pname => $pname, ws => $workspace, revisionid => $revisionid }
     );
     $uri .= '?verbose=1' if $self->json_verbose;
 
@@ -1334,15 +1365,21 @@ sub _request {
     warn "uri: $uri\n" if $self->verbose;
 
     my $request = HTTP::Request->new( $p{method}, $uri );
-    if ( $self->user_cookie ) {
-        $request->header( 'Cookie' => 'NLW-user=' . $self->user_cookie );
-    } else {
-        $request->authorization_basic( $self->username, $self->password );
+    if ( !$self->siteminder ) {
+        if ( $self->user_cookie ) {
+            $request->header( 'Cookie' => 'NLW-user=' . $self->user_cookie );
+        }
+        else {
+            $request->authorization_basic( $self->username, $self->password );
+        }
     }
     $request->header( 'Accept'       => $p{accept} )   if $p{accept};
     $request->header( 'Content-Type' => $p{type} )     if $p{type};
     $request->header( 'If-Match'     => $p{if_match} ) if $p{if_match};
     $request->header( 'X-On-Behalf-Of' => $self->on_behalf_of ) if $self->on_behalf_of;
+    foreach my $key (keys %{$self->additional_headers}) {
+        $request->header($key => $self->additional_headers->{$key});
+    }
 
     if ($p{method} eq 'PUT') {
         my $content_len = 0;
